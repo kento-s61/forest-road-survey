@@ -103,7 +103,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 
 <script>
 const $=id=>document.getElementById(id);
-let rawAngle=null,zero=0,distance=0,rows=[],stream=null,liveDist=null;
+let rawAngle=null,zero=90,distance=0,rows=[],stream=null,liveDist=null;
 
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),1400)}
 function norm(a){while(a>180)a-=360;while(a<-180)a+=360;return a}
