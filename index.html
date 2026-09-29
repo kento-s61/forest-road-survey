@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#23452f">
+<title>森林作業道 測量メモ</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17251b;background:#f2f5f1}
+body{margin:0;padding:14px;max-width:760px;margin-inline:auto}
+header{background:#23452f;color:white;padding:16px;border-radius:14px}
+h1{font-size:21px;margin:0 0 6px} .muted{font-size:13px;opacity:.85}
+.card{background:white;border-radius:14px;padding:15px;margin:12px 0;box-shadow:0 2px 8px #0000000d}
+button,input{font:inherit} button{border:0;border-radius:10px;padding:12px 14px;background:#2f6943;color:white;font-weight:600}
+button.secondary{background:#e4ece6;color:#23452f} button.danger{background:#9c3737}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:1}
+#video{width:100%;aspect-ratio:4/3;object-fit:cover;background:#17251b;border-radius:10px}
+.big{font-size:46px;font-weight:700;letter-spacing:-2px}.unit{font-size:16px;color:#617166}
+label{display:block;font-size:14px;margin-bottom:6px;color:#526257}input{box-sizing:border-box;width:100%;padding:11px;border:1px solid #ccd6ce;border-radius:9px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px 5px;border-bottom:1px solid #e5ebe6}
+.note{font-size:13px;line-height:1.55;color:#5d695f}.status{font-size:14px;color:#2f6943}
+</style>
+</head>
+<body>
+<header><h1>森林作業道 測量メモ</h1><div class="muted">iPhone向け・ブラウザ試作版（ホーム画面に追加して使用）</div></header>
+<section class="card">
+<h2>カメラ・傾斜表示</h2>
+<video id="video" autoplay muted playsinline></video>
+<div class="row" style="margin-top:10px"><button id="start">カメラ・センサーを開始</button><button class="secondary" id="cal">現在角度を0°に設定</button></div>
+<div style="text-align:center;padding:12px 0"><div class="big" id="angle">--.-°</div><div class="unit">端末の前後傾斜（補正後）</div><div class="status" id="slope">縦断勾配 --.- %</div></div>
+<p class="note">端末の傾きから算出する参考値です。路面そのものの勾配を直接測るものではありません。測定時は端末を一定の姿勢で保持し、既知の勾配や測量機器で現地検証してください。</p>
+</section>
+<section class="card">
+<h2>距離・測点記録</h2>
+<div class="row"><div><label for="interval">記録間隔（m）</label><input id="interval" type="number" value="10" min="0.1" step="0.1"></div><div><label for="design">設計勾配（%・任意）</label><input id="design" type="number" step="0.1" placeholder="例：8.0"></div></div>
+<div class="row" style="margin-top:10px"><button id="add">測点を記録</button><button class="secondary" id="plus">距離を加算</button><button class="secondary" id="reset">距離リセット</button></div>
+<p><strong>累計距離：</strong><span id="distance">0.0</span> m　<strong>記録点：</strong><span id="count">0</span></p>
+<div style="overflow-x:auto"><table><thead><tr><th>No.</th><th>距離(m)</th><th>勾配(%)</th><th>角度</th><th>設計との差</th></tr></thead><tbody id="records"></tbody></table></div>
+<div class="row" style="margin-top:12px"><button id="csv">CSVを書き出す</button><button class="secondary" id="clear">記録を全消去</button></div>
+</section>
+<section class="card"><h2>使い方</h2><ol class="note"><li>Safariでこのページを開き、カメラ・センサーを開始します。</li><li>カメラとモーションの許可を求められたら許可します。</li><li>端末を進行方向に向け、同じ持ち方で測定します。</li><li>測点位置で「測点を記録」。距離は「距離を加算」で入力した間隔分進みます。</li><li>最後にCSVを書き出し、表計算ソフトで確認します。</li></ol></section>
+<script>
+const $=id=>document.getElementById(id); let rawAngle=null,zero=0,distance=0,rows=[],stream=null;
+function update(){if(rawAngle===null)return;let a=rawAngle-zero;while(a>180)a-=360;while(a< -180)a+=360;
+$('angle').textContent=a.toFixed(1)+'°';$('slope').textContent='縦断勾配 '+(Math.tan(a*Math.PI/180)*100).toFixed(1)+' %';}
+function orientation(e){let v=e.beta;if(v===null||v===undefined)return;rawAngle=v;update();}
+$('start').onclick=async()=>{try{
+if(!navigator.mediaDevices?.getUserMedia)throw Error('このブラウザではカメラを利用できません。HTTPSのSafariで開いてください。');
+stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('video').srcObject=stream;
+if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+const p=await DeviceOrientationEvent.requestPermission();if(p!=='granted')throw Error('モーションセンサーが許可されませんでした。');}
+window.addEventListener('deviceorientation',orientation,true);$('start').textContent='開始済み';$('start').disabled=true;
+}catch(e){alert('開始できませんでした：'+e.message)}};
+$('cal').onclick=()=>{if(rawAngle===null){alert('先にセンサーを開始してください');return}zero=rawAngle;update()};
+$('plus').onclick=()=>{let n=Number($('interval').value);if(!(n>0)){alert('記録間隔を入力してください');return}distance+=n;$('distance').textContent=distance.toFixed(1)};
+$('reset').onclick=()=>{distance=0;$('distance').textContent='0.0'};
+$('add').onclick=()=>{if(rawAngle===null){alert('先にセンサーを開始してください');return}let a=rawAngle-zero;while(a>180)a-=360;while(a< -180)a+=360;let g=Math.tan(a*Math.PI/180)*100,d=$('design').value===''?'':(g-Number($('design').value)).toFixed(1);rows.push({no:rows.length+1,distance:distance.toFixed(1),grade:g.toFixed(1),angle:a.toFixed(1),diff:d});render()};
+function render(){$('count').textContent=rows.length;$('records').innerHTML=rows.map(r=>`<tr><td>${r.no}</td><td>${r.distance}</td><td>${r.grade}</td><td>${r.angle}</td><td>${r.diff}</td></tr>`).join('')}
+$('clear').onclick=()=>{if(confirm('すべての測点記録を消去しますか？')){rows=[];render()}};
+$('csv').onclick=()=>{if(!rows.length){alert('記録がありません');return}let s='No.,Distance_m,Grade_percent,Angle_degree,Design_difference_percent\\n'+rows.map(r=>[r.no,r.distance,r.grade,r.angle,r.diff].join(',')).join('\\n');let blob=new Blob(['\\ufeff'+s],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='forest_road_survey.csv';a.click();URL.revokeObjectURL(url)};
+</script></body></html>
