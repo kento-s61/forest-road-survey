@@ -63,7 +63,7 @@ $('start').onclick=async()=>{
   }catch(e){
     if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
     window.removeEventListener('deviceorientation',orientation,true);
-    alert('開始できませんでした：'+e.message);
+    alert('【v2】開始できませんでした：'+e.message);
   }
 };
 
