@@ -43,18 +43,35 @@ const $=id=>document.getElementById(id); let rawAngle=null,zero=0,distance=0,row
 function update(){if(rawAngle===null)return;let a=rawAngle-zero;while(a>180)a-=360;while(a< -180)a+=360;
 $('angle').textContent=a.toFixed(1)+'°';$('slope').textContent='縦断勾配 '+(Math.tan(a*Math.PI/180)*100).toFixed(1)+' %';}
 function orientation(e){let v=e.beta;if(v===null||v===undefined)return;rawAngle=v;update();}
-$('start').onclick=async()=>{try{
-if(!navigator.mediaDevices?.getUserMedia)throw Error('このブラウザではカメラを利用できません。HTTPSのSafariで開いてください。');
-stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('video').srcObject=stream;
-if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
-const p=await DeviceOrientationEvent.requestPermission();if(p!=='granted')throw Error('モーションセンサーが許可されませんでした。');}
-window.addEventListener('deviceorientation',orientation,true);$('start').textContent='開始済み';$('start').disabled=true;
-}catch(e){alert('開始できませんでした：'+e.message)}};
+
+$('start').onclick=async()=>{
+  try{
+    // 1) 傾きセンサーの許可を最初に要求する（この前に await を置かない）
+    if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+      const p=await DeviceOrientationEvent.requestPermission();
+      if(p!=='granted')throw Error('モーションセンサーが許可されませんでした。');
+    }
+    window.addEventListener('deviceorientation',orientation,true);
+
+    // 2) その後にカメラを起動する
+    if(!navigator.mediaDevices?.getUserMedia)throw Error('このブラウザではカメラを利用できません。HTTPSのSafariで開いてください。');
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    $('video').srcObject=stream;
+    await $('video').play();
+
+    $('start').textContent='開始済み';$('start').disabled=true;
+  }catch(e){
+    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+    window.removeEventListener('deviceorientation',orientation,true);
+    alert('開始できませんでした：'+e.message);
+  }
+};
+
 $('cal').onclick=()=>{if(rawAngle===null){alert('先にセンサーを開始してください');return}zero=rawAngle;update()};
 $('plus').onclick=()=>{let n=Number($('interval').value);if(!(n>0)){alert('記録間隔を入力してください');return}distance+=n;$('distance').textContent=distance.toFixed(1)};
 $('reset').onclick=()=>{distance=0;$('distance').textContent='0.0'};
 $('add').onclick=()=>{if(rawAngle===null){alert('先にセンサーを開始してください');return}let a=rawAngle-zero;while(a>180)a-=360;while(a< -180)a+=360;let g=Math.tan(a*Math.PI/180)*100,d=$('design').value===''?'':(g-Number($('design').value)).toFixed(1);rows.push({no:rows.length+1,distance:distance.toFixed(1),grade:g.toFixed(1),angle:a.toFixed(1),diff:d});render()};
 function render(){$('count').textContent=rows.length;$('records').innerHTML=rows.map(r=>`<tr><td>${r.no}</td><td>${r.distance}</td><td>${r.grade}</td><td>${r.angle}</td><td>${r.diff}</td></tr>`).join('')}
 $('clear').onclick=()=>{if(confirm('すべての測点記録を消去しますか？')){rows=[];render()}};
-$('csv').onclick=()=>{if(!rows.length){alert('記録がありません');return}let s='No.,Distance_m,Grade_percent,Angle_degree,Design_difference_percent\\n'+rows.map(r=>[r.no,r.distance,r.grade,r.angle,r.diff].join(',')).join('\\n');let blob=new Blob(['\\ufeff'+s],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='forest_road_survey.csv';a.click();URL.revokeObjectURL(url)};
+$('csv').onclick=()=>{if(!rows.length){alert('記録がありません');return}let s='No.,Distance_m,Grade_percent,Angle_degree,Design_difference_percent\n'+rows.map(r=>[r.no,r.distance,r.grade,r.angle,r.diff].join(',')).join('\n');let blob=new Blob(['\ufeff'+s],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='forest_road_survey.csv';a.click();URL.revokeObjectURL(url)};
 </script></body></html>
